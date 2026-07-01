@@ -50,7 +50,7 @@ public class ResidualFunc_Doxy_PEP implements MultivariateFunction {
 	protected final HashMap<String, String> cross_ref_map;
 
 	private HashMap<String, Double> eval_point_cache;
-	private double minResidue = Double.POSITIVE_INFINITY;
+//	private double minResidue = Double.POSITIVE_INFINITY;
 
 	// For simulation	
 //	private Properties sim_prop;
