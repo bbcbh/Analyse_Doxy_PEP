@@ -14,9 +14,9 @@ public class Launcher_Analysis {
 				"Results_Infectious_Prevalence_Person.7z", "Results_Infectious_Prevalence_Site.7z",
 				"Results_Treatment_Person.7z" };
 
-		boolean correctUsage = false;
+		boolean correctUsage = args.length > 0;
 
-		if (args.length > 0) {
+		if (correctUsage) {
 			File baseDir = new File(args[0]);
 			Pattern pattern_seed_dir = Pattern.compile("Seed_List_(\\d+)");
 
@@ -53,11 +53,9 @@ public class Launcher_Analysis {
 				// TODO: next level of analysis
 
 			}
-		}
-
-		if (!correctUsage) {
+		} else {
 			System.out.println(usageInfo);
-			System.exit(0);
+			System.exit(-1);
 		}
 
 	}
