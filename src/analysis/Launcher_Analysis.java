@@ -58,10 +58,6 @@ public class Launcher_Analysis {
 			} else {
 				System.out.printf("Generating summary data from %d simulation directories\n", seedDirs.length);
 
-				String[] result_names = new String[] { //
-						"Incidence_Person", //
-						//"Infectious_Prevalence_Site", //
-						};
 				Pattern pattern_sim_id = Pattern.compile("\\[(.*)\\].*");
 				Pattern pattern_sim_col_name = Pattern.compile(".*(\\d+).csv:(\\d+)");
 
@@ -88,6 +84,22 @@ public class Launcher_Analysis {
 				int maxRow = 0;
 
 				for (File seedDir : seedDirs) {
+
+					Pattern pattern_result_files = Pattern.compile("Results_(.*).7z");
+					File[] result_files = seedDir.listFiles(new FileFilter() {
+						@Override
+						public boolean accept(File pathname) {
+							return pattern_result_files.matcher(pathname.getName()).matches();
+						}
+					});
+
+					String[] result_names = new String[result_files.length];
+					for (int i = 0; i < result_names.length; i++) {
+						Matcher m = pattern_result_files.matcher(result_files[i].getName());
+						m.matches();
+						result_names[i] = m.group(1);
+					}
+
 					for (String result_name : result_names) {
 						File zipFile = new File(seedDir, String.format("Results_%s.7z", result_name));
 						if (zipFile.exists()) {
@@ -205,7 +217,7 @@ public class Launcher_Analysis {
 						}
 
 						pWri.close();
-						
+
 						System.out.printf("%s generated.\n", summaryFile.getAbsolutePath());
 
 					}
