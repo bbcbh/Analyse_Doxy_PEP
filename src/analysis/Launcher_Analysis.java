@@ -59,7 +59,7 @@ public class Launcher_Analysis {
 				System.out.printf("Generating summary data from %d simulation directories\n", seedDirs.length);
 
 				Pattern pattern_sim_id = Pattern.compile("\\[(.*)\\].*");
-				Pattern pattern_sim_col_name = Pattern.compile(".*(\\d+).csv:(\\d+)");
+				Pattern pattern_sim_col_name = Pattern.compile(".*_(\\d+).csv:(\\d+)");
 
 				// K = sim_id, V = col entry
 				HashMap<String, String[]> mapEnt_by_sim;
@@ -120,22 +120,28 @@ public class Launcher_Analysis {
 								m.matches();
 								String sim_id = m.group(1).replace(',', ':');
 								ArrayList<String[]> fileEnt_val_arr = zip_ent.get(fileEnt_name);
-								String[] header_row = fileEnt_val_arr.get(0);
 
-								for (int c = 0; c < header_row.length; c++) {
-									String col_header = header_row[c];
-									mapEnt_by_sim = mapEnt_by_col.get(col_header);
-									if (mapEnt_by_sim == null) {
-										mapEnt_by_sim = new HashMap<>();
-										mapEnt_by_col.put(col_header, mapEnt_by_sim);
+								if (fileEnt_val_arr.size() > 0) {
+									String[] header_row = fileEnt_val_arr.get(0);
+									for (int c = 0; c < header_row.length; c++) {
+										String col_header = header_row[c];
+										mapEnt_by_sim = mapEnt_by_col.get(col_header);
+										if (mapEnt_by_sim == null) {
+											mapEnt_by_sim = new HashMap<>();
+											mapEnt_by_col.put(col_header, mapEnt_by_sim);
+										}
+										String[] col_val = new String[fileEnt_val_arr.size()];
+										col_val[0] = sim_id;
+										for (int r = 1; r < fileEnt_val_arr.size(); r++) {
+											col_val[r] = fileEnt_val_arr.get(r)[c];
+										}
+										mapEnt_by_sim.put(sim_id, col_val);
+										maxRow = Math.max(maxRow, col_val.length);
 									}
-									String[] col_val = new String[fileEnt_val_arr.size()];
-									col_val[0] = sim_id;
-									for (int r = 1; r < fileEnt_val_arr.size(); r++) {
-										col_val[r] = fileEnt_val_arr.get(r)[c];
-									}
-									mapEnt_by_sim.put(sim_id, col_val);
-									maxRow = Math.max(maxRow, col_val.length);
+								}else {
+									System.out.printf("Warning: Null entries for %s.\n", fileEnt_name);
+									
+									
 								}
 
 							}
@@ -162,6 +168,7 @@ public class Launcher_Analysis {
 							common_time_col = col;
 						}
 					}
+					common_time_col[0] = "Time";
 
 					String[] col_names = mapEnt_by_col.keySet().toArray(new String[0]);
 
