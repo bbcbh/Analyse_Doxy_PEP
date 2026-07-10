@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map.Entry;
@@ -16,7 +17,9 @@ public class Launcher_Analysis {
 
 	public static void main(String[] args) throws IOException {
 
-		String usageInfo = "Usage: java -jar Analyse_Doxy_PEP.jar BASEDIR_SIM";
+		final String FLAG_ANALYSE_PART = "-analyse_partial_results";
+		String usageInfo = String.format("Usage: java -jar Analyse_Doxy_PEP.jar BASEDIR_SIM <%s=TF>",
+				FLAG_ANALYSE_PART);
 		String[] check_7z = new String[] { "Results_Incidence_Person.7z", "Results_Incidence_Site.7z",
 				"Results_Infectious_Prevalence_Person.7z", "Results_Infectious_Prevalence_Site.7z",
 				"Results_Treatment_Person.7z" };
@@ -24,7 +27,17 @@ public class Launcher_Analysis {
 		boolean correctUsage = args.length > 0;
 
 		if (correctUsage) {
+
+			boolean analyse_partial_results = false;
 			File baseDir = new File(args[0]);
+
+			for (int a = 1; a < args.length; a++) {
+				if (args[a].startsWith(FLAG_ANALYSE_PART)) {
+					String[] arg_v = args[a].split("=");
+					analyse_partial_results = arg_v.length == 1 || Boolean.valueOf(arg_v[1]);
+				}
+			}
+
 			Pattern pattern_seed_dir = Pattern.compile("Seed_List_(\\d+)");
 
 			File[] seedDirs = baseDir.listFiles(new FileFilter() {
@@ -54,21 +67,15 @@ public class Launcher_Analysis {
 				for (File seedDir : incompleteDir) {
 					System.out.printf("   -seedMap=%1$s/%1$s.csv\n", seedDir.getName());
 				}
+			}
 
-			} else {
+			if (incompleteDir.size() == 0 || analyse_partial_results) {
 				System.out.printf("Generating summary data from %d simulation directories\n", seedDirs.length);
 
 				Pattern pattern_sim_id = Pattern.compile("\\[(.*)\\].*");
 				Pattern pattern_sim_col_name = Pattern.compile(".*_(\\d+).csv:(\\d+)");
 
-				// K = sim_id, V = col entry
-				HashMap<String, String[]> mapEnt_by_sim;
-				// K = col_name, V = mapEnt_by_sim
-				HashMap<String, HashMap<String, String[]>> mapEnt_by_col;
-				// K = res set name, V = mapEnt_by_col
-				HashMap<String, HashMap<String, HashMap<String, String[]>>> mapEnt_by_result_set = new HashMap<>();
-
-				Arrays.sort(seedDirs, new Comparator<File>() {
+				Comparator<File> cmp_seed_file = new Comparator<File>() {
 					@Override
 					public int compare(File o1, File o2) {
 						Matcher m1 = pattern_seed_dir.matcher(o1.getName());
@@ -79,78 +86,88 @@ public class Launcher_Analysis {
 							return 0;
 						}
 					}
-				});
+				};
+
+				// K = sim_id, V = col entry
+				HashMap<String, String[]> mapEnt_by_sim;
+				// K = col_name, V = mapEnt_by_sim
+				HashMap<String, HashMap<String, String[]>> mapEnt_by_col;
+				// K = res set name, V = mapEnt_by_col
+				HashMap<String, HashMap<String, HashMap<String, String[]>>> mapEnt_by_result_set = new HashMap<>();
+
+				Arrays.sort(seedDirs, cmp_seed_file);
+				incompleteDir.sort(cmp_seed_file);
 
 				int maxRow = 0;
 
 				for (File seedDir : seedDirs) {
-
-					Pattern pattern_result_files = Pattern.compile("Results_(.*).7z");
-					File[] result_files = seedDir.listFiles(new FileFilter() {
-						@Override
-						public boolean accept(File pathname) {
-							return pattern_result_files.matcher(pathname.getName()).matches();
-						}
-					});
-
-					String[] result_names = new String[result_files.length];
-					for (int i = 0; i < result_names.length; i++) {
-						Matcher m = pattern_result_files.matcher(result_files[i].getName());
-						m.matches();
-						result_names[i] = m.group(1);
-					}
-
-					for (String result_name : result_names) {
-						File zipFile = new File(seedDir, String.format("Results_%s.7z", result_name));
-						if (zipFile.exists()) {
-							HashMap<String, ArrayList<String[]>> zip_ent = new HashMap<>();
-							zip_ent = util.StaticMethods.extractedLinesFrom7Zip(zipFile, zip_ent, null);
-
-							mapEnt_by_col = mapEnt_by_result_set.get(result_name);
-							if (mapEnt_by_col == null) {
-								mapEnt_by_col = new HashMap<>();
-								mapEnt_by_result_set.put(result_name, mapEnt_by_col);
+					if (Collections.binarySearch(incompleteDir, seedDir) < 0) {
+						Pattern pattern_result_files = Pattern.compile("Results_(.*).7z");
+						File[] result_files = seedDir.listFiles(new FileFilter() {
+							@Override
+							public boolean accept(File pathname) {
+								return pattern_result_files.matcher(pathname.getName()).matches();
 							}
+						});
 
-							String[] fileEnt_names = zip_ent.keySet().toArray(new String[0]);
-							Arrays.sort(fileEnt_names);
+						String[] result_names = new String[result_files.length];
+						for (int i = 0; i < result_names.length; i++) {
+							Matcher m = pattern_result_files.matcher(result_files[i].getName());
+							m.matches();
+							result_names[i] = m.group(1);
+						}
 
-							for (String fileEnt_name : fileEnt_names) {
-								Matcher m = pattern_sim_id.matcher(fileEnt_name);
-								m.matches();
-								String sim_id = m.group(1).replace(',', ':');
-								ArrayList<String[]> fileEnt_val_arr = zip_ent.get(fileEnt_name);
+						for (String result_name : result_names) {
+							File zipFile = new File(seedDir, String.format("Results_%s.7z", result_name));
+							if (zipFile.exists()) {
+								HashMap<String, ArrayList<String[]>> zip_ent = new HashMap<>();
+								zip_ent = util.StaticMethods.extractedLinesFrom7Zip(zipFile, zip_ent, null);
 
-								if (fileEnt_val_arr.size() > 0) {
-									String[] header_row = fileEnt_val_arr.get(0);
-									for (int c = 0; c < header_row.length; c++) {
-										String col_header = header_row[c];
-										mapEnt_by_sim = mapEnt_by_col.get(col_header);
-										if (mapEnt_by_sim == null) {
-											mapEnt_by_sim = new HashMap<>();
-											mapEnt_by_col.put(col_header, mapEnt_by_sim);
+								mapEnt_by_col = mapEnt_by_result_set.get(result_name);
+								if (mapEnt_by_col == null) {
+									mapEnt_by_col = new HashMap<>();
+									mapEnt_by_result_set.put(result_name, mapEnt_by_col);
+								}
+
+								String[] fileEnt_names = zip_ent.keySet().toArray(new String[0]);
+								Arrays.sort(fileEnt_names);
+
+								for (String fileEnt_name : fileEnt_names) {
+									Matcher m = pattern_sim_id.matcher(fileEnt_name);
+									m.matches();
+									String sim_id = m.group(1).replace(',', ':');
+									ArrayList<String[]> fileEnt_val_arr = zip_ent.get(fileEnt_name);
+
+									if (fileEnt_val_arr.size() > 0) {
+										String[] header_row = fileEnt_val_arr.get(0);
+										for (int c = 0; c < header_row.length; c++) {
+											String col_header = header_row[c];
+											mapEnt_by_sim = mapEnt_by_col.get(col_header);
+											if (mapEnt_by_sim == null) {
+												mapEnt_by_sim = new HashMap<>();
+												mapEnt_by_col.put(col_header, mapEnt_by_sim);
+											}
+											String[] col_val = new String[fileEnt_val_arr.size()];
+											col_val[0] = sim_id;
+											for (int r = 1; r < fileEnt_val_arr.size(); r++) {
+												col_val[r] = fileEnt_val_arr.get(r)[c];
+											}
+											mapEnt_by_sim.put(sim_id, col_val);
+											maxRow = Math.max(maxRow, col_val.length);
 										}
-										String[] col_val = new String[fileEnt_val_arr.size()];
-										col_val[0] = sim_id;
-										for (int r = 1; r < fileEnt_val_arr.size(); r++) {
-											col_val[r] = fileEnt_val_arr.get(r)[c];
-										}
-										mapEnt_by_sim.put(sim_id, col_val);
-										maxRow = Math.max(maxRow, col_val.length);
+									} else {
+										System.out.printf("Warning: Null entries for %s.\n", fileEnt_name);
+
 									}
-								}else {
-									System.out.printf("Warning: Null entries for %s.\n", fileEnt_name);
-									
-									
+
 								}
 
 							}
 
 						}
-
 					}
 
-				}
+				} // End of for (File seedDir : seedDirs) {...
 
 				// Summarise stored results
 				for (Entry<String, HashMap<String, HashMap<String, String[]>>> resultSetEnt : mapEnt_by_result_set
